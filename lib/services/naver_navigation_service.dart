@@ -6,8 +6,10 @@ import '../model/route_info.dart';
 
 class NaverNavigationService {
   late final Dio _dio;
+  late final Dio _searchDio;
 
   NaverNavigationService() {
+    // 네이버 클라우드 (Maps API)
     _dio = Dio(
       BaseOptions(
         baseUrl: ApiConfig.naverApiBaseUrl,
@@ -27,6 +29,26 @@ class NaverNavigationService {
         logPrint: (obj) => print('API: $obj'),
       ),
     );
+
+    // 카카오 (Local Search API)
+    _searchDio = Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.kakaoBaseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        headers: {
+          'Authorization': 'KakaoAK ${ApiConfig.kakaoRestApiKey}',
+        },
+      ),
+    );
+
+    _searchDio.interceptors.add(
+      LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+        logPrint: (obj) => print('SearchAPI: $obj'),
+      ),
+    );
   }
 
   // 현재 위치
@@ -39,7 +61,6 @@ class NaverNavigationService {
         print('위치 서비스가 비활성화되어 있습니다');
         return null;
       }
-
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -59,7 +80,7 @@ class NaverNavigationService {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      print('현재 위치는 (${position.latitude}, ${position.longitude} 입니다.)');
+      print('현재 위치는 (${position.latitude}, ${position.longitude}) 입니다.');
 
       return Location(
         latitude: position.latitude,
@@ -71,10 +92,63 @@ class NaverNavigationService {
     }
   }
 
+  // 장소명으로 검색 (카카오 Local Search API)
+  Future<Location?> searchPlace(String query) async {
+    try {
+      print('장소 검색 중입니다: $query');
 
+      final response = await _searchDio.get(
+        ApiConfig.kakaoKeywordSearchPath,
+        queryParameters: {
+          'query': query,
+          'size': 1,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        var data = response.data;
+        if (data['documents'] != null && data['documents'].isNotEmpty) {
+          var item = data['documents'][0];
+
+          double lng = double.parse(item['x']);
+          double lat = double.parse(item['y']);
+          String placeName = item['place_name'];
+          String address = item['road_address_name'] ?? item['address_name'] ?? placeName;
+
+          print('장소 검색 결과: $placeName ($lat, $lng)');
+          print('주소: $address');
+
+          return Location(
+            latitude: lat,
+            longitude: lng,
+            address: address,
+          );
+        } else {
+          print('장소 검색 결과가 없습니다');
+        }
+      }
+      return null;
+    } on DioException catch (e) {
+      print('장소 검색 오류: ${e.message}');
+      if (e.response != null) {
+        print('오류 상세: ${e.response?.data}');
+      }
+      return null;
+    }
+  }
+
+  // 주소에서 좌표 변환 (geocoding 실패 시 장소 검색으로 fallback)
+  Future<Location?> findLocation(String query) async {
+    // 1차: 주소 검색 (geocoding)
+    Location? result = await geocoding(query);
+    if (result != null) return result;
+
+    // 2차: 장소명 검색 (local search)
+    print('주소 검색 실패, 장소명으로 재검색합니다');
+    return await searchPlace(query);
+  }
 
   // 주소에서 좌표 변환
-
   Future<Location?> geocoding(String address) async {
     try {
       print('주소 검색 중입니다: $address');
@@ -95,7 +169,7 @@ class NaverNavigationService {
             address: result['roadAddress'] ?? result['jibunAddress'],
           );
         } else {
-          print('검색 결과가 없습니다. 다시 검색해주세요');
+          print('주소 검색 결과가 없습니다');
         }
       }
       return null;
@@ -108,9 +182,7 @@ class NaverNavigationService {
     }
   }
 
-
   // 좌표에서 주소 변환
-
   Future<String?> reverseGeocoding(double lat, double lng) async {
     try {
       print('주소 변환 중입니다: ($lat, $lng)');
@@ -149,7 +221,7 @@ class NaverNavigationService {
     }
   }
 
-// 경로 찾기
+  // 경로 찾기
   Future<RouteInfo?> getRoute({
     required Location start,
     required Location goal,
@@ -185,7 +257,6 @@ class NaverNavigationService {
           RouteInfo routeInfo = RouteInfo.fromJson(routeData);
 
           print('사용된 경로 옵션: $actualOption');
-
           print('경로 찾기에 성공하였습니다');
           print('거리: ${routeInfo.distanceInKm}km');
           print('시간: ${routeInfo.durationInMinutes}분');
@@ -206,9 +277,7 @@ class NaverNavigationService {
     }
   }
 
-
   // 통합 경로 요청
-
   Future<RouteInfo?> getRouteByAddress({
     String? startAddress,
     required String goalAddress,
@@ -223,20 +292,21 @@ class NaverNavigationService {
           return null;
         }
       } else {
-        start = await geocoding(startAddress);
+        start = await findLocation(startAddress);
         if (start == null) {
           print('출발지 주소를 찾을 수 없습니다');
           return null;
         }
       }
 
-      Location? goal = await geocoding(goalAddress);
+      // geocoding → 실패 시 장소 검색으로 fallback
+      Location? goal = await findLocation(goalAddress);
       if (goal == null) {
-        print('목적지 주소를 찾을 수 없습니다');
+        print('목적지를 찾을 수 없습니다');
         return null;
       }
 
-      //경로 탐색
+      // 경로 탐색
       return await getRoute(start: start, goal: goal);
     } catch (e) {
       print('통합 경로 요청 실패: $e');
