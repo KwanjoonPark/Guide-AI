@@ -45,5 +45,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>시각장애인 길 안내를 위해 현재 위치가 필요합니다.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>백그라운드에서도 정확한 길 안내를 위해 위치 정보가 필요합니다.</string>
 </dict>
 </plist>
