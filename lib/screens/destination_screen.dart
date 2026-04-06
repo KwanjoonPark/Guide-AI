@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../services/naver_navigation_service.dart';
+import '../model/route_info.dart';
+import 'navigation_screen.dart';
 
 class DestinationScreen extends StatefulWidget {
   const DestinationScreen({super.key});
@@ -16,6 +19,8 @@ class _DestinationScreenState extends State<DestinationScreen> {
 
   final FlutterTts _tts = FlutterTts();
   final stt.SpeechToText _speech = stt.SpeechToText();
+  final NaverNavigationService _naverService = NaverNavigationService();
+
   bool _isListening = false;
   bool _speechAvailable = false;
   String _recognizedText = '';
@@ -182,9 +187,20 @@ class _DestinationScreenState extends State<DestinationScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             _tts.speak('$_recognizedText(으)로 안내를 시작합니다');
-                            // TODO: 경로 안내 화면으로 이동
+                            // 경로 안내 화면으로 이동
+                            final routeInfo = await _naverService.getRouteByAddress(
+                              goalAddress: _recognizedText,
+                            );
+                            if (routeInfo != null && mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => NavigationScreen(routeInfo: routeInfo),
+                                ),
+                              );
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _accentColor,
@@ -213,3 +229,4 @@ class _DestinationScreenState extends State<DestinationScreen> {
     );
   }
 }
+
