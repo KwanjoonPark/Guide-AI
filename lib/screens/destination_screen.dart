@@ -3,6 +3,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/naver_navigation_service.dart';
 import '../model/route_info.dart';
+import '../widgets/accessible_button.dart';
 import 'navigation_screen.dart';
 
 class DestinationScreen extends StatefulWidget {
@@ -34,9 +35,12 @@ class _DestinationScreenState extends State<DestinationScreen> {
 
     _initSpeech();
 
-    // 화면 진입 시 TTS 안내
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tts.speak('목적지를 말씀해주세요');
+      _tts.setCompletionHandler(() {
+        _tts.setCompletionHandler(() {});
+        _startListening();
+      });
     });
   }
 
@@ -67,7 +71,7 @@ class _DestinationScreenState extends State<DestinationScreen> {
         if (result.finalResult) {
           setState(() => _isListening = false);
           if (_recognizedText.isNotEmpty) {
-            _tts.speak('$_recognizedText, 맞으시면 안내 시작을 눌러주세요');
+            _tts.speak('$_recognizedText, 맞으시면 안내 시작을 두 번 눌러주세요');
           }
         }
       },
@@ -89,6 +93,21 @@ class _DestinationScreenState extends State<DestinationScreen> {
     }
   }
 
+  Future<void> _startNavigation() async {
+    _tts.speak('$_recognizedText(으)로 안내를 시작합니다');
+    final routeInfo = await _naverService.getRouteByAddress(
+      goalAddress: _recognizedText,
+    );
+    if (routeInfo != null && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NavigationScreen(routeInfo: routeInfo),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,15 +118,20 @@ class _DestinationScreenState extends State<DestinationScreen> {
           child: Column(
             children: [
               const SizedBox(height: 24),
-              // 상단 바: 뒤로가기 + 제목
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Colors.white,
-                      size: 28,
+                  AccessibleButton(
+                    tts: _tts,
+                    label: '뒤로가기',
+                    doubleTapMessage: '홈 화면으로 돌아갑니다',
+                    onDoubleTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -122,7 +146,6 @@ class _DestinationScreenState extends State<DestinationScreen> {
                 ],
               ),
               const Spacer(flex: 2),
-              // 상태 텍스트
               Text(
                 _isListening ? '듣고 있습니다...' : '마이크를 눌러 말씀해주세요',
                 style: TextStyle(
@@ -131,9 +154,10 @@ class _DestinationScreenState extends State<DestinationScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-              // 마이크 버튼
-              GestureDetector(
-                onTap: _toggleListening,
+              AccessibleButton(
+                tts: _tts,
+                label: _isListening ? '음성 인식 중지' : '음성 인식 시작',
+                onDoubleTap: _toggleListening,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   width: _isListening ? 140 : 120,
@@ -158,7 +182,6 @@ class _DestinationScreenState extends State<DestinationScreen> {
                 ),
               ),
               const SizedBox(height: 40),
-              // 인식된 텍스트 표시
               if (_recognizedText.isNotEmpty)
                 Container(
                   width: double.infinity,
@@ -183,35 +206,23 @@ class _DestinationScreenState extends State<DestinationScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            _tts.speak('$_recognizedText(으)로 안내를 시작합니다');
-                            // 경로 안내 화면으로 이동
-                            final routeInfo = await _naverService.getRouteByAddress(
-                              goalAddress: _recognizedText,
-                            );
-                            if (routeInfo != null && mounted) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => NavigationScreen(routeInfo: routeInfo),
-                                ),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _accentColor,
-                            foregroundColor: _bgColor,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                      AccessibleButton(
+                        tts: _tts,
+                        label: '안내 시작',
+                        ttsMessage: '$_recognizedText(으)로 안내 시작. 두 번 누르면 안내를 시작합니다',
+                        onDoubleTap: _startNavigation,
+                        child: Container(
+                          width: double.infinity,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: _accentColor,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text(
+                          alignment: Alignment.center,
+                          child: Text(
                             '안내 시작',
                             style: TextStyle(
+                              color: _bgColor,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -229,4 +240,3 @@ class _DestinationScreenState extends State<DestinationScreen> {
     );
   }
 }
-

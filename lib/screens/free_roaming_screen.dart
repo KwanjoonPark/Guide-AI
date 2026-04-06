@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import '../widgets/accessible_button.dart';
 
 class FreeRoamingScreen extends StatefulWidget {
   const FreeRoamingScreen({super.key});
@@ -73,15 +74,22 @@ class _FreeRoamingScreenState extends State<FreeRoamingScreen> {
               right: 16,
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: IconButton.styleFrom(
-                      backgroundColor: _bgColor.withValues(alpha: 0.7),
-                    ),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Colors.white,
-                      size: 28,
+                  AccessibleButton(
+                    tts: _tts,
+                    label: '뒤로가기',
+                    doubleTapMessage: '홈 화면으로 돌아갑니다',
+                    onDoubleTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _bgColor.withValues(alpha: 0.7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

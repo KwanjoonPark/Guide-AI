@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../model/route_info.dart';
+import '../widgets/accessible_button.dart';
 
 class NavigationScreen extends StatefulWidget {
   final RouteInfo routeInfo;
@@ -12,6 +13,10 @@ class NavigationScreen extends StatefulWidget {
 }
 
 class _NavigationScreenState extends State<NavigationScreen> {
+  static const _bgColor = Color(0xFF0D1B2A);
+  static const _accentColor = Color(0xFF00E5CC);
+  static const _cardColor = Color(0xFF1B2D45);
+
   final FlutterTts _tts = FlutterTts();
   int _currentStep = 0;
 
@@ -19,7 +24,24 @@ class _NavigationScreenState extends State<NavigationScreen> {
   void initState() {
     super.initState();
     _initTts();
-    _speakCurrentInstruction();
+    _speakEntryGuide();
+  }
+
+  Future<void> _speakEntryGuide() async {
+    String distanceText;
+    if (widget.routeInfo.totalDistance >= 1000) {
+      double km = widget.routeInfo.totalDistance / 1000.0;
+      distanceText = '${km.toStringAsFixed(1)}킬로미터';
+    } else {
+      distanceText = '${widget.routeInfo.totalDistance}미터';
+    }
+    int totalMin = (widget.routeInfo.totalDuration / 60).ceil();
+    if (totalMin < 1) totalMin = 1;
+    await _tts.speak('총 거리 $distanceText, 예상 시간 ${totalMin}분입니다.');
+    _tts.setCompletionHandler(() {
+      _speakCurrentInstruction();
+      _tts.setCompletionHandler(() {});
+    });
   }
 
   Future<void> _initTts() async {
@@ -37,9 +59,16 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }
 
   Future<void> _speakSummary() async {
-    int totalKm = (widget.routeInfo.totalDistance / 1000).round();
-    int totalMin = (widget.routeInfo.totalDuration / 60).round();
-    await _tts.speak('총 거리 ${totalKm}킬로미터, 예상 시간 ${totalMin}분입니다.');
+    String distanceText;
+    if (widget.routeInfo.totalDistance >= 1000) {
+      double km = widget.routeInfo.totalDistance / 1000.0;
+      distanceText = '${km.toStringAsFixed(1)}킬로미터';
+    } else {
+      distanceText = '${widget.routeInfo.totalDistance}미터';
+    }
+    int totalMin = (widget.routeInfo.totalDuration / 60).ceil();
+    if (totalMin < 1) totalMin = 1;
+    await _tts.speak('총 거리 $distanceText, 예상 시간 ${totalMin}분입니다.');
   }
 
   @override
@@ -51,31 +80,40 @@ class _NavigationScreenState extends State<NavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1B2A),
+      backgroundColor: _bgColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1B2D45),
+        backgroundColor: _cardColor,
+        leading: AccessibleButton(
+          tts: _tts,
+          label: '뒤로가기',
+          doubleTapMessage: '목적지 설정 화면으로 돌아갑니다',
+          onDoubleTap: () => Navigator.pop(context),
+          child: const Padding(
+            padding: EdgeInsets.all(8),
+            child: Icon(Icons.arrow_back, color: _accentColor, size: 32),
+          ),
+        ),
         title: const Text(
           '경로 안내',
           style: TextStyle(
-            color: Color(0xFF00E5CC),
+            color: _accentColor,
             fontSize: 28,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Color(0xFF00E5CC), size: 32),
       ),
       body: Column(
         children: [
-          // 📊 요약 정보
+          // 요약 정보
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             margin: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1B2D45),
+              color: _cardColor,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF00E5CC), width: 3),
+              border: Border.all(color: _accentColor, width: 3),
             ),
             child: Column(
               children: [
@@ -85,7 +123,9 @@ class _NavigationScreenState extends State<NavigationScreen> {
                     _buildInfoChip(
                       icon: Icons.straighten,
                       label: '총 거리',
-                      value: '${(widget.routeInfo.totalDistance / 1000).toStringAsFixed(1)} km',
+                      value: widget.routeInfo.totalDistance >= 1000
+                          ? '${(widget.routeInfo.totalDistance / 1000).toStringAsFixed(1)} km'
+                          : '${widget.routeInfo.totalDistance} m',
                     ),
                     _buildInfoChip(
                       icon: Icons.access_time,
@@ -95,22 +135,30 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: _speakSummary,
-                  icon: const Icon(Icons.volume_up, size: 28),
-                  label: const Text(
-                    '요약 정보 듣기',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E5CC),
-                    foregroundColor: const Color(0xFF0D1B2A),
+                AccessibleButton(
+                  tts: _tts,
+                  label: '요약 정보 듣기',
+                  onDoubleTap: _speakSummary,
+                  child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
+                      color: _accentColor,
                       borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.volume_up, size: 28, color: _bgColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          '요약 정보 듣기',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _bgColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -118,21 +166,21 @@ class _NavigationScreenState extends State<NavigationScreen> {
             ),
           ),
 
-          // 📍 현재 안내
+          // 현재 안내
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
-              color: const Color(0xFF00E5CC),
+              color: _accentColor,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               children: [
-                const Text(
-                  '🔊 현재 안내',
+                Text(
+                  '현재 안내',
                   style: TextStyle(
-                    color: Color(0xFF0D1B2A),
+                    color: _bgColor,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -142,8 +190,8 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   _currentStep < widget.routeInfo.guides.length
                       ? widget.routeInfo.guides[_currentStep].instructions
                       : '목적지에 도착했습니다!',
-                  style: const TextStyle(
-                    color: Color(0xFF0D1B2A),
+                  style: TextStyle(
+                    color: _bgColor,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     height: 1.4,
@@ -151,22 +199,30 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: _speakCurrentInstruction,
-                  icon: const Icon(Icons.replay, size: 28),
-                  label: const Text(
-                    '다시 듣기',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D1B2A),
-                    foregroundColor: const Color(0xFF00E5CC),
+                AccessibleButton(
+                  tts: _tts,
+                  label: '다시 듣기',
+                  onDoubleTap: _speakCurrentInstruction,
+                  child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
+                      color: _bgColor,
                       borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.replay, size: 28, color: _accentColor),
+                        const SizedBox(width: 8),
+                        const Text(
+                          '다시 듣기',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _accentColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -176,12 +232,12 @@ class _NavigationScreenState extends State<NavigationScreen> {
 
           const SizedBox(height: 24),
 
-          // 📜 전체 경로 리스트
+          // 전체 경로 리스트
           Expanded(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1B2D45),
+                color: _cardColor,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: ListView.builder(
@@ -191,8 +247,10 @@ class _NavigationScreenState extends State<NavigationScreen> {
                   final guide = widget.routeInfo.guides[index];
                   final isCurrent = index == _currentStep;
 
-                  return GestureDetector(
-                    onTap: () {
+                  return AccessibleButton(
+                    tts: _tts,
+                    label: guide.instructions,
+                    onDoubleTap: () {
                       setState(() {
                         _currentStep = index;
                       });
@@ -203,13 +261,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: isCurrent
-                            ? const Color(0xFF00E5CC).withOpacity(0.2)
-                            : const Color(0xFF0D1B2A),
+                            ? _accentColor.withValues(alpha: 0.2)
+                            : _bgColor,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isCurrent
-                              ? const Color(0xFF00E5CC)
-                              : const Color(0xFF1B2D45),
+                          color: isCurrent ? _accentColor : _cardColor,
                           width: 3,
                         ),
                       ),
@@ -217,15 +273,11 @@ class _NavigationScreenState extends State<NavigationScreen> {
                         children: [
                           CircleAvatar(
                             radius: 24,
-                            backgroundColor: isCurrent
-                                ? const Color(0xFF00E5CC)
-                                : const Color(0xFF1B2D45),
+                            backgroundColor: isCurrent ? _accentColor : _cardColor,
                             child: Text(
                               '${index + 1}',
                               style: TextStyle(
-                                color: isCurrent
-                                    ? const Color(0xFF0D1B2A)
-                                    : const Color(0xFF00E5CC),
+                                color: isCurrent ? _bgColor : _accentColor,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
                               ),
@@ -239,9 +291,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                 Text(
                                   guide.instructions,
                                   style: TextStyle(
-                                    color: isCurrent
-                                        ? const Color(0xFF00E5CC)
-                                        : Colors.white,
+                                    color: isCurrent ? _accentColor : Colors.white,
                                     fontSize: 18,
                                     fontWeight: isCurrent
                                         ? FontWeight.bold
@@ -255,8 +305,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
                                     child: Text(
                                       '${guide.distance}m',
                                       style: TextStyle(
-                                        color: const Color(0xFF00E5CC)
-                                            .withOpacity(0.7),
+                                        color: _accentColor.withValues(alpha: 0.7),
                                         fontSize: 16,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -286,7 +335,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
   }) {
     return Column(
       children: [
-        Icon(icon, color: const Color(0xFF00E5CC), size: 36),
+        Icon(icon, color: _accentColor, size: 36),
         const SizedBox(height: 12),
         Text(
           label,
@@ -300,7 +349,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
         Text(
           value,
           style: const TextStyle(
-            color: Color(0xFF00E5CC),
+            color: _accentColor,
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
@@ -309,4 +358,3 @@ class _NavigationScreenState extends State<NavigationScreen> {
     );
   }
 }
-
